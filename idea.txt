@@ -1,10 +1,13 @@
-6. Task Manager with Accountability Partner
+Project: Progress Buddy
 
-What it does:
-Users can add tasks, and optionally share with a friend who gets updates (mock email or dashboard).
+A simple web app to log measurable activities, visualize progress, set goals, and keep an accountability partner in the loop.
 
-Tech: Django + SQLite, minimal auth, simple notifications.
+Core Concepts
 
-Why: Useful + shows basic auth + CRUD + relationships.
+Activities: categories you track (e.g., “Workout”, “LeetCode”).
 
-Scope: To-do list + "assign/share" feature = <20 hrs.
+Logs: time-stamped entries with metrics (e.g., sets/reps/weight; problems_solved).
+
+Goals: target progress for a period (e.g., “50 LeetCode problems in August”, “10 workouts this month”).
+
+Partner: one buddy gets notified about your achievements, streaks, and goal hits.
