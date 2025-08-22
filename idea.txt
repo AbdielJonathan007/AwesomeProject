@@ -1,0 +1,10 @@
+6. Task Manager with Accountability Partner
+
+What it does:
+Users can add tasks, and optionally share with a friend who gets updates (mock email or dashboard).
+
+Tech: Django + SQLite, minimal auth, simple notifications.
+
+Why: Useful + shows basic auth + CRUD + relationships.
+
+Scope: To-do list + "assign/share" feature = <20 hrs.
