@@ -5,8 +5,6 @@ import ActivityList from './components/ActivityList'
 import LogForm from './components/LogForm'
 import LogList from './components/LogList'
 
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 
 function App() {
@@ -19,7 +17,7 @@ function App() {
 
   return (
     <>
-      <div className='App'>
+      <div className='root'>
         <h1>Progress Buddy</h1>
         <ActivityForm  setActivities={setActivities} />
         <ActivityList activities={activities} on={setSelectedActivity} />
