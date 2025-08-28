@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import ApiService from '../services/api.js';
 
-export default function ActivityForm({ setActivities }) {
+export default function ActivityForm({ setActivities, onActivityCreated }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [specific, setSpecific] = useState('');
@@ -10,30 +11,47 @@ export default function ActivityForm({ setActivities }) {
   const [timebound, setTimebound] = useState('');
   const [buddyEmail, setBuddyEmail] = useState('');
 
-  const handleSubmit = (e) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newActivity = {
-      id: Date.now(),
-      name,
-      description,
-      specific,
-      measurable,
-      achievable,
-      relevant, //Why it matters
-      timebound,
-      buddyEmail, // Accountability partner email
-      steps:[],
-      completed: false
-    };
-    setActivities(prev => [...prev, newActivity]);
-    setName('');
-    setDescription('');
-    setSpecific('');
-    setMeasurable('');
-    setAchievable('');
-    setRelevant('');
-    setTimebound('');
-    setBuddyEmail('');
+    setIsLoading(true);
+
+    try {
+      const newActivity = await ApiService.createActivity({
+        name,
+        description,
+        specific,
+        measurable,
+        achievable,
+        relevant,
+        timebound,
+        buddy_email: buddyEmail
+      });
+
+      // Update the activities list
+      setActivities(prev => [...prev, newActivity]);
+
+      // Call callback if provided
+      if (onActivityCreated) {
+        onActivityCreated(newActivity);
+      }
+
+      // Reset form
+      setName('');
+      setDescription('');
+      setSpecific('');
+      setMeasurable('');
+      setAchievable('');
+      setRelevant('');
+      setTimebound('');
+      setBuddyEmail('');
+    } catch (error) {
+      console.error('Failed to create activity:', error);
+      alert('Failed to create activity. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
 return (
@@ -139,9 +157,10 @@ return (
 
             <button
                 type="submit"
-                className="w-full bg-blue-500 hover:bg-blue-600 transition-colors text-white font-bold px-4 py-3 rounded-xl shadow-lg mt-4"
+                disabled={isLoading}
+                className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 transition-colors text-white font-bold px-4 py-3 rounded-xl shadow-lg mt-4"
             >
-                Add Goal
+                {isLoading ? 'Creating Goal...' : 'Add Goal'}
             </button>
         </div>
     </form>
