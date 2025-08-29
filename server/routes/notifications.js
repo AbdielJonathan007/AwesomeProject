@@ -1,7 +1,8 @@
 import express from 'express';
-import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 
 const router = express.Router();
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // Database instance will be injected
 let db;
@@ -9,22 +10,6 @@ let db;
 export function setDatabase(databaseInstance) {
   db = databaseInstance;
 }
-
-// Configure email transporter (using Gmail as example)
-// In production, you'd want to use environment variables for credentials
-const createTransporter = () => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error('Email credentials not configured. Please set EMAIL_USER and EMAIL_PASS in .env file.');
-  }
-  
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS // Use app-specific password for Gmail
-    }
-  });
-};
 
 // Send achievement notification
 router.post('/achievement', async (req, res) => {
@@ -54,43 +39,31 @@ router.post('/achievement', async (req, res) => {
       LIMIT 5
     `, [activity_id]);
 
-    let transporter;
-    try {
-      transporter = createTransporter();
-    } catch (error) {
-      return res.status(400).json({
-        error: 'Email not configured',
-        message: 'Email notifications require EMAIL_USER and EMAIL_PASS to be set in the server/.env file. See README.md for setup instructions.'
-      });
-    }
-
-    const emailContent = `
-      <h2>🎉 Progress Update from your accountability partner!</h2>
-      <p><strong>Activity:</strong> ${activity.name}</p>
-      <p><strong>Goal:</strong> ${activity.specific}</p>
-      
-      ${message ? `<p><strong>Message:</strong> ${message}</p>` : ''}
-      
-      <h3>Recent Progress:</h3>
-      <ul>
-        ${recentLogs.map(log => `
-          <li>${new Date(log.created_at).toLocaleDateString()}: ${log.text}</li>
-        `).join('')}
-      </ul>
-      
-      <p>Keep up the great work! 💪</p>
-      
-      <small>This notification was sent from Progress Buddy</small>
-    `;
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    const msg = {
       to: activity.buddy_email,
+      from: 'abdielrosalina09@gmail.com', // must be a verified sender in SendGrid
       subject: `Progress Update: ${activity.name}`,
-      html: emailContent
+      html: `
+        <h2>🎉 Progress Update from your accountability partner!</h2>
+        <p><strong>Activity:</strong> ${activity.name}</p>
+        <p><strong>Goal:</strong> ${activity.specific}</p>
+        
+        ${message ? `<p><strong>Message:</strong> ${message}</p>` : ''}
+        
+        <h3>Recent Progress:</h3>
+        <ul>
+          ${recentLogs.map(log => `
+            <li>${new Date(log.created_at).toLocaleDateString()}: ${log.text}</li>
+          `).join('')}
+        </ul>
+        
+        <p>Keep up the great work! 💪</p>
+        
+        <small>This notification was sent from Progress Buddy</small>
+      `,
     };
 
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
 
     res.json({ 
       success: true, 
@@ -136,47 +109,35 @@ router.post('/goal-completed', async (req, res) => {
       WHERE activity_id = ?
     `, [activity_id]);
 
-    let transporter;
-    try {
-      transporter = createTransporter();
-    } catch (error) {
-      return res.status(400).json({
-        error: 'Email not configured',
-        message: 'Email notifications require EMAIL_USER and EMAIL_PASS to be set in the server/.env file. See README.md for setup instructions.'
-      });
-    }
-
-    const emailContent = `
-      <h2>🎯 GOAL ACHIEVED! 🎉</h2>
-      <p>Your accountability partner has completed their goal!</p>
-      
-      <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3>${activity.name}</h3>
-        <p><strong>Goal:</strong> ${activity.specific}</p>
-        <p><strong>Target:</strong> ${activity.measurable}</p>
-        <p><strong>Deadline:</strong> ${new Date(activity.timebound).toLocaleDateString()}</p>
-      </div>
-      
-      <h3>Achievement Stats:</h3>
-      <ul>
-        <li><strong>Total Log Entries:</strong> ${logStats.total_logs}</li>
-        <li><strong>Started:</strong> ${new Date(logStats.started_date).toLocaleDateString()}</li>
-        <li><strong>Completed:</strong> ${new Date(logStats.completed_date).toLocaleDateString()}</li>
-      </ul>
-      
-      <p>🎊 Congratulations to your accountability partner on this achievement! Consider sending them a congratulatory message!</p>
-      
-      <small>This notification was sent from Progress Buddy</small>
-    `;
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    const msg = {
       to: activity.buddy_email,
+      from: 'your_verified_sender@example.com', // must be a verified sender in SendGrid
       subject: `🎯 Goal Achieved: ${activity.name}`,
-      html: emailContent
+      html: `
+        <h2>🎯 GOAL ACHIEVED! 🎉</h2>
+        <p>Your accountability partner has completed their goal!</p>
+        
+        <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>${activity.name}</h3>
+          <p><strong>Goal:</strong> ${activity.specific}</p>
+          <p><strong>Target:</strong> ${activity.measurable}</p>
+          <p><strong>Deadline:</strong> ${new Date(activity.timebound).toLocaleDateString()}</p>
+        </div>
+        
+        <h3>Achievement Stats:</h3>
+        <ul>
+          <li><strong>Total Log Entries:</strong> ${logStats.total_logs}</li>
+          <li><strong>Started:</strong> ${new Date(logStats.started_date).toLocaleDateString()}</li>
+          <li><strong>Completed:</strong> ${new Date(logStats.completed_date).toLocaleDateString()}</li>
+        </ul>
+        
+        <p>🎊 Congratulations to your accountability partner on this achievement! Consider sending them a congratulatory message!</p>
+        
+        <small>This notification was sent from Progress Buddy</small>
+      `,
     };
 
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
 
     res.json({ 
       success: true, 
@@ -220,45 +181,33 @@ router.post('/weekly-summary', async (req, res) => {
       ORDER BY created_at DESC
     `, [activity_id]);
 
-    let transporter;
-    try {
-      transporter = createTransporter();
-    } catch (error) {
-      return res.status(400).json({
-        error: 'Email not configured',
-        message: 'Email notifications require EMAIL_USER and EMAIL_PASS to be set in the server/.env file. See README.md for setup instructions.'
-      });
-    }
-
-    const emailContent = `
-      <h2>📊 Weekly Progress Summary</h2>
-      <p>Here's how your accountability partner did this week:</p>
-      
-      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3>${activity.name}</h3>
-        <p><strong>This Week's Activity:</strong> ${weeklyLogs.length} log entries</p>
-      </div>
-      
-      ${weeklyLogs.length > 0 ? `
-        <h3>This Week's Progress:</h3>
-        <ul>
-          ${weeklyLogs.map(log => `
-            <li>${new Date(log.created_at).toLocaleDateString()}: ${log.text}</li>
-          `).join('')}
-        </ul>
-      ` : '<p>No activity logged this week. Maybe reach out and offer some encouragement! 💪</p>'}
-      
-      <small>This weekly summary was sent from Progress Buddy</small>
-    `;
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    const msg = {
       to: activity.buddy_email,
+      from: 'your_verified_sender@example.com', // must be a verified sender in SendGrid
       subject: `Weekly Summary: ${activity.name}`,
-      html: emailContent
+      html: `
+        <h2>📊 Weekly Progress Summary</h2>
+        <p>Here's how your accountability partner did this week:</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>${activity.name}</h3>
+          <p><strong>This Week's Activity:</strong> ${weeklyLogs.length} log entries</p>
+        </div>
+        
+        ${weeklyLogs.length > 0 ? `
+          <h3>This Week's Progress:</h3>
+          <ul>
+            ${weeklyLogs.map(log => `
+              <li>${new Date(log.created_at).toLocaleDateString()}: ${log.text}</li>
+            `).join('')}
+          </ul>
+        ` : '<p>No activity logged this week. Maybe reach out and offer some encouragement! 💪</p>'}
+        
+        <small>This weekly summary was sent from Progress Buddy</small>
+      `,
     };
 
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
 
     res.json({ 
       success: true, 

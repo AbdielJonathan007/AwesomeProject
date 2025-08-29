@@ -8,6 +8,25 @@ export default function ActivityList({ activities, onSelect, selectedActivity, o
     );
   }
 
+  function handleNotifyBuddy(activity) {
+    fetch('/api/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: activity.buddy_email,
+        goal: activity.name // or any goal details you want to send
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert('Notification sent!');
+      } else {
+        alert('Failed to send notification.');
+      }
+    });
+  }
+
   return (
     <div className="bg-gray-800/80 rounded-2xl p-6">
       <h2 className="text-2xl font-bold text-blue-400 mb-4">Your Goals</h2>
@@ -53,6 +72,16 @@ export default function ActivityList({ activities, onSelect, selectedActivity, o
                   title="Delete Goal"
                 >
                   🗑️ Delete
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNotifyBuddy(activity);
+                  }}
+                  className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded transition-colors"
+                  title="Notify Buddy"
+                >
+                  🔔 Notify Buddy
                 </button>
                 <span className="text-xs opacity-60">
                   Created: {new Date(activity.created_at).toLocaleDateString()}
