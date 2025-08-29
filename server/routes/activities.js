@@ -1,9 +1,13 @@
 import express from 'express';
-import { Database } from '../database.js';
 
 const router = express.Router();
-const db = new Database();
-await db.init();
+
+// Database instance will be injected
+let db;
+
+export function setDatabase(databaseInstance) {
+  db = databaseInstance;
+}
 
 // Get all activities
 router.get('/', async (req, res) => {

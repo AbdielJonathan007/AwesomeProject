@@ -1,4 +1,4 @@
-export default function ActivityList({ activities, onSelect, selectedActivity }) {
+export default function ActivityList({ activities, onSelect, selectedActivity, onDelete }) {
   if (activities.length === 0) {
     return (
       <div className="bg-gray-800/80 rounded-2xl p-6">
@@ -15,15 +15,17 @@ export default function ActivityList({ activities, onSelect, selectedActivity })
         {activities.map((activity) => (
           <div
             key={activity.id}
-            className={`p-4 rounded-lg cursor-pointer transition-all ${
+            className={`p-4 rounded-lg transition-all ${
               selectedActivity?.id === activity.id
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-700 hover:bg-gray-600 text-gray-100'
             }`}
-            onClick={() => onSelect(activity)}
           >
             <div className="flex justify-between items-start">
-              <div className="flex-1">
+              <div
+                className="flex-1 cursor-pointer"
+                onClick={() => onSelect(activity)}
+              >
                 <h3 className="font-semibold text-lg">{activity.name}</h3>
                 {activity.description && (
                   <p className="text-sm opacity-80 mt-1">{activity.description}</p>
@@ -42,6 +44,16 @@ export default function ActivityList({ activities, onSelect, selectedActivity })
                     ✓ Completed
                   </span>
                 )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(activity.id);
+                  }}
+                  className="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded transition-colors"
+                  title="Delete Goal"
+                >
+                  🗑️ Delete
+                </button>
                 <span className="text-xs opacity-60">
                   Created: {new Date(activity.created_at).toLocaleDateString()}
                 </span>

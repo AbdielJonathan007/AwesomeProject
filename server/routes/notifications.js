@@ -1,15 +1,23 @@
 import express from 'express';
 import nodemailer from 'nodemailer';
-import { Database } from '../database.js';
 
 const router = express.Router();
-const db = new Database();
-await db.init();
+
+// Database instance will be injected
+let db;
+
+export function setDatabase(databaseInstance) {
+  db = databaseInstance;
+}
 
 // Configure email transporter (using Gmail as example)
 // In production, you'd want to use environment variables for credentials
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    throw new Error('Email credentials not configured. Please set EMAIL_USER and EMAIL_PASS in .env file.');
+  }
+  
+  return nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
@@ -46,7 +54,15 @@ router.post('/achievement', async (req, res) => {
       LIMIT 5
     `, [activity_id]);
 
-    const transporter = createTransporter();
+    let transporter;
+    try {
+      transporter = createTransporter();
+    } catch (error) {
+      return res.status(400).json({
+        error: 'Email not configured',
+        message: 'Email notifications require EMAIL_USER and EMAIL_PASS to be set in the server/.env file. See README.md for setup instructions.'
+      });
+    }
 
     const emailContent = `
       <h2>🎉 Progress Update from your accountability partner!</h2>
@@ -120,7 +136,15 @@ router.post('/goal-completed', async (req, res) => {
       WHERE activity_id = ?
     `, [activity_id]);
 
-    const transporter = createTransporter();
+    let transporter;
+    try {
+      transporter = createTransporter();
+    } catch (error) {
+      return res.status(400).json({
+        error: 'Email not configured',
+        message: 'Email notifications require EMAIL_USER and EMAIL_PASS to be set in the server/.env file. See README.md for setup instructions.'
+      });
+    }
 
     const emailContent = `
       <h2>🎯 GOAL ACHIEVED! 🎉</h2>
@@ -196,7 +220,15 @@ router.post('/weekly-summary', async (req, res) => {
       ORDER BY created_at DESC
     `, [activity_id]);
 
-    const transporter = createTransporter();
+    let transporter;
+    try {
+      transporter = createTransporter();
+    } catch (error) {
+      return res.status(400).json({
+        error: 'Email not configured',
+        message: 'Email notifications require EMAIL_USER and EMAIL_PASS to be set in the server/.env file. See README.md for setup instructions.'
+      });
+    }
 
     const emailContent = `
       <h2>📊 Weekly Progress Summary</h2>

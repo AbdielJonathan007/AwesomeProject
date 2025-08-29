@@ -71,6 +71,30 @@ function App() {
     }
   };
 
+  const handleDeleteActivity = async (activityId) => {
+    if (!confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await ApiService.deleteActivity(activityId);
+      
+      // Remove from local state
+      setActivities(prev => prev.filter(activity => activity.id !== activityId));
+      
+      // Clear selection if deleted activity was selected
+      if (selectedActivity && selectedActivity.id === activityId) {
+        setSelectedActivity(null);
+        setLogs([]);
+      }
+      
+      alert('Goal deleted successfully!');
+    } catch (error) {
+      console.error('Failed to delete activity:', error);
+      alert('Failed to delete goal. Please try again.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex items-center justify-center">
@@ -117,6 +141,7 @@ function App() {
               activities={activities}
               onSelect={handleActivitySelect}
               selectedActivity={selectedActivity}
+              onDelete={handleDeleteActivity}
             />
             
             {selectedActivity && (
