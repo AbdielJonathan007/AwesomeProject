@@ -1,12 +1,11 @@
 import express from 'express';
-import sgMail from '@sendgrid/mail';
+import { Resend } from 'resend';
 
 const router = express.Router();
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Database instance will be injected
 let db;
-
 export function setDatabase(databaseInstance) {
   db = databaseInstance;
 }
@@ -15,23 +14,12 @@ export function setDatabase(databaseInstance) {
 router.post('/achievement', async (req, res) => {
   try {
     const { activity_id, message } = req.body;
+    if (!activity_id) return res.status(400).json({ error: 'Missing activity_id' });
 
-    if (!activity_id) {
-      return res.status(400).json({ error: 'Activity ID is required' });
-    }
-
-    // Get activity with buddy email
     const activity = await db.get('SELECT * FROM activities WHERE id = ?', [activity_id]);
-    
-    if (!activity) {
-      return res.status(404).json({ error: 'Activity not found' });
-    }
+    if (!activity) return res.status(404).json({ error: 'Activity not found' });
+    if (!activity.buddy_email) return res.status(400).json({ error: 'No buddy email for this activity' });
 
-    if (!activity.buddy_email) {
-      return res.status(400).json({ error: 'No accountability partner email set for this activity' });
-    }
-
-    // Get recent logs for context
     const recentLogs = await db.all(`
       SELECT * FROM logs 
       WHERE activity_id = ? 
@@ -39,44 +27,25 @@ router.post('/achievement', async (req, res) => {
       LIMIT 5
     `, [activity_id]);
 
-    const msg = {
+    const logSummary = recentLogs.map(log => `• ${log.note} (${log.created_at})`).join('<br>');
+    const html = `
+      <p>Your buddy made an achievement:</p>
+      <p>${message}</p>
+      <p>Recent progress:</p>
+      <p>${logSummary}</p>
+    `;
+
+    await resend.emails.send({
+      from: 'onboarding@resend.dev',
       to: activity.buddy_email,
-      from: 'abdielrosalina09@gmail.com', // must be a verified sender in SendGrid
-      subject: `Progress Update: ${activity.name}`,
-      html: `
-        <h2>🎉 Progress Update from your accountability partner!</h2>
-        <p><strong>Activity:</strong> ${activity.name}</p>
-        <p><strong>Goal:</strong> ${activity.specific}</p>
-        
-        ${message ? `<p><strong>Message:</strong> ${message}</p>` : ''}
-        
-        <h3>Recent Progress:</h3>
-        <ul>
-          ${recentLogs.map(log => `
-            <li>${new Date(log.created_at).toLocaleDateString()}: ${log.text}</li>
-          `).join('')}
-        </ul>
-        
-        <p>Keep up the great work! 💪</p>
-        
-        <small>This notification was sent from Progress Buddy</small>
-      `,
-    };
-
-    await sgMail.send(msg);
-
-    res.json({ 
-      success: true, 
-      message: 'Notification sent successfully',
-      sent_to: activity.buddy_email 
+      subject: 'Progress Buddy: Achievement Notification',
+      html,
     });
 
+    res.json({ success: true });
   } catch (error) {
-    console.error('Error sending notification:', error);
-    res.status(500).json({ 
-      error: 'Failed to send notification',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    console.error('Resend error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -84,73 +53,29 @@ router.post('/achievement', async (req, res) => {
 router.post('/goal-completed', async (req, res) => {
   try {
     const { activity_id } = req.body;
-
-    if (!activity_id) {
-      return res.status(400).json({ error: 'Activity ID is required' });
-    }
+    if (!activity_id) return res.status(400).json({ error: 'Missing activity_id' });
 
     const activity = await db.get('SELECT * FROM activities WHERE id = ?', [activity_id]);
-    
-    if (!activity) {
-      return res.status(404).json({ error: 'Activity not found' });
-    }
+    if (!activity) return res.status(404).json({ error: 'Activity not found' });
+    if (!activity.buddy_email) return res.status(400).json({ error: 'No buddy email for this activity' });
 
-    if (!activity.buddy_email) {
-      return res.status(400).json({ error: 'No accountability partner email set for this activity' });
-    }
+    const html = `
+      <p>Congratulations! Your buddy completed the goal:</p>
+      <strong>${activity.name}</strong>
+      <p>Description: ${activity.description}</p>
+    `;
 
-    // Get total logs count
-    const logStats = await db.get(`
-      SELECT 
-        COUNT(*) as total_logs,
-        DATE(MIN(created_at)) as started_date,
-        DATE(MAX(created_at)) as completed_date
-      FROM logs 
-      WHERE activity_id = ?
-    `, [activity_id]);
-
-    const msg = {
+    await resend.emails.send({
+      from: 'onboarding@resend.dev',
       to: activity.buddy_email,
-      from: 'your_verified_sender@example.com', // must be a verified sender in SendGrid
-      subject: `🎯 Goal Achieved: ${activity.name}`,
-      html: `
-        <h2>🎯 GOAL ACHIEVED! 🎉</h2>
-        <p>Your accountability partner has completed their goal!</p>
-        
-        <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3>${activity.name}</h3>
-          <p><strong>Goal:</strong> ${activity.specific}</p>
-          <p><strong>Target:</strong> ${activity.measurable}</p>
-          <p><strong>Deadline:</strong> ${new Date(activity.timebound).toLocaleDateString()}</p>
-        </div>
-        
-        <h3>Achievement Stats:</h3>
-        <ul>
-          <li><strong>Total Log Entries:</strong> ${logStats.total_logs}</li>
-          <li><strong>Started:</strong> ${new Date(logStats.started_date).toLocaleDateString()}</li>
-          <li><strong>Completed:</strong> ${new Date(logStats.completed_date).toLocaleDateString()}</li>
-        </ul>
-        
-        <p>🎊 Congratulations to your accountability partner on this achievement! Consider sending them a congratulatory message!</p>
-        
-        <small>This notification was sent from Progress Buddy</small>
-      `,
-    };
-
-    await sgMail.send(msg);
-
-    res.json({ 
-      success: true, 
-      message: 'Goal completion notification sent successfully',
-      sent_to: activity.buddy_email 
+      subject: 'Progress Buddy: Goal Completed!',
+      html,
     });
 
+    res.json({ success: true });
   } catch (error) {
-    console.error('Error sending goal completion notification:', error);
-    res.status(500).json({ 
-      error: 'Failed to send notification',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    console.error('Resend error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -158,70 +83,57 @@ router.post('/goal-completed', async (req, res) => {
 router.post('/weekly-summary', async (req, res) => {
   try {
     const { activity_id } = req.body;
-
-    if (!activity_id) {
-      return res.status(400).json({ error: 'Activity ID is required' });
-    }
+    if (!activity_id) return res.status(400).json({ error: 'Missing activity_id' });
 
     const activity = await db.get('SELECT * FROM activities WHERE id = ?', [activity_id]);
-    
-    if (!activity) {
-      return res.status(404).json({ error: 'Activity not found' });
-    }
+    if (!activity) return res.status(404).json({ error: 'Activity not found' });
+    if (!activity.buddy_email) return res.status(400).json({ error: 'No buddy email for this activity' });
 
-    if (!activity.buddy_email) {
-      return res.status(400).json({ error: 'No accountability partner email set for this activity' });
-    }
-
-    // Get logs from the last 7 days
-    const weeklyLogs = await db.all(`
+    const logs = await db.all(`
       SELECT * FROM logs 
       WHERE activity_id = ? 
       AND created_at >= datetime('now', '-7 days')
       ORDER BY created_at DESC
     `, [activity_id]);
 
-    const msg = {
+    const logSummary = logs.length
+      ? logs.map(log => `• ${log.note} (${log.created_at})`).join('<br>')
+      : 'No progress logged this week.';
+
+    const html = `
+      <p>Weekly Progress Summary for Goal: <strong>${activity.name}</strong></p>
+      <p>${logSummary}</p>
+    `;
+
+    await resend.emails.send({
+      from: 'onboarding@resend.dev',
       to: activity.buddy_email,
-      from: 'your_verified_sender@example.com', // must be a verified sender in SendGrid
-      subject: `Weekly Summary: ${activity.name}`,
-      html: `
-        <h2>📊 Weekly Progress Summary</h2>
-        <p>Here's how your accountability partner did this week:</p>
-        
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3>${activity.name}</h3>
-          <p><strong>This Week's Activity:</strong> ${weeklyLogs.length} log entries</p>
-        </div>
-        
-        ${weeklyLogs.length > 0 ? `
-          <h3>This Week's Progress:</h3>
-          <ul>
-            ${weeklyLogs.map(log => `
-              <li>${new Date(log.created_at).toLocaleDateString()}: ${log.text}</li>
-            `).join('')}
-          </ul>
-        ` : '<p>No activity logged this week. Maybe reach out and offer some encouragement! 💪</p>'}
-        
-        <small>This weekly summary was sent from Progress Buddy</small>
-      `,
-    };
-
-    await sgMail.send(msg);
-
-    res.json({ 
-      success: true, 
-      message: 'Weekly summary sent successfully',
-      sent_to: activity.buddy_email,
-      logs_this_week: weeklyLogs.length
+      subject: 'Progress Buddy: Weekly Progress Summary',
+      html,
     });
 
+    res.json({ success: true });
   } catch (error) {
-    console.error('Error sending weekly summary:', error);
-    res.status(500).json({ 
-      error: 'Failed to send weekly summary',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    console.error('Resend error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Notify when a new goal is set
+router.post('/', async (req, res) => {
+  const { email, goal } = req.body;
+  try {
+    const result = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: email,
+      subject: 'Your Progress Buddy Goal',
+      html: `<strong>Your buddy set a goal: ${goal}</strong>`,
     });
+    console.log('Resend API result:', result);
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error('Resend error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
