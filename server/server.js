@@ -59,7 +59,7 @@ async function startServer() {
     
     app.listen(PORT, () => {
       console.log(`🚀 Progress Buddy API server running on port ${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`📊 Health check: http://port${PORT}/api/health`);
     });
     
   } catch (error) {
