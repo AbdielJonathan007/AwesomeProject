@@ -1,4 +1,4 @@
-const API_BASE_URL ='https://progress-buddy.up.railway.app;'
+const API_BASE_URL ='https://progress-buddy.up.railway.app';
 
 class ApiService {
   async request(endpoint, options = {}) {
