@@ -27,7 +27,10 @@ router.post('/achievement', async (req, res) => {
       LIMIT 5
     `, [activity_id]);
 
-    const logSummary = recentLogs.map(log => `• ${log.note} (${log.created_at})`).join('<br>');
+    const logSummary = recentLogs.map(log => {
+      const details = log.text || log.note || log.description || log.entry || 'No details';
+      return `• ${details} (${log.created_at})`;
+    }).join('<br>');
     const html = `
       <p>Your buddy made an achievement:</p>
       <p>${message}</p>
@@ -97,7 +100,10 @@ router.post('/weekly-summary', async (req, res) => {
     `, [activity_id]);
 
     const logSummary = logs.length
-      ? logs.map(log => `• ${log.note} (${log.created_at})`).join('<br>')
+      ? logs.map(log => {
+          const details = log.note || log.description || log.entry || log.text || 'No details';
+          return `• ${details} (${log.created_at})`;
+        }).join('<br>')
       : 'No progress logged this week.';
 
     const html = `
@@ -121,13 +127,21 @@ router.post('/weekly-summary', async (req, res) => {
 
 // Notify when a new goal is set
 router.post('/', async (req, res) => {
-  const { email, goal } = req.body;
+  const { email, goal, description, measurable, timebound, relevant } = req.body;
   try {
+    const html = `
+      <h2>Your buddy set a new goal!</h2>
+      <strong>${goal}</strong>
+      <p>Description: ${description}</p>
+      <p>Target: ${measurable}</p>
+      <p>Due: ${timebound}</p>
+      <p>Why this matters: ${relevant}</p>
+    `;
     const result = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: email,
       subject: 'Your Progress Buddy Goal',
-      html: `<strong>Your buddy set a goal: ${goal}</strong>`,
+      html,
     });
     console.log('Resend API result:', result);
     res.json({ success: true, result });
